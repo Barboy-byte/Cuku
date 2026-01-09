@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geometry Dash Clone</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        canvas {
+            border: none;
+            background: #000;
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 20px;
+            z-index: 10;
+        }
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 20;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background: #fff;
+            color: #000;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">Score: 0</div>
+    <canvas id="game-canvas"></canvas>
+    <div id="start-screen">
+        <h1>Tap to Start</h1>
+        <p>Tap to jump over obstacles!</p>
+    </div>
+    <div id="game-over-screen" style="display: none;">
+        <h1>Game Over</h1>
+        <p id="final-score">Score: 0</p>
+        <button id="restart-btn">Restart</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const ui = document.getElementById('ui');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const restartBtn = document.getElementById('restart-btn');
+        const finalScore = document.getElementById('final-score');
+
+        // Set canvas size based on screen
+        function resizeCanvas() {
+            const isLandscape = window.innerWidth > window.innerHeight;
+            if (isLandscape) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            } else {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Game variables
+        let gameState = 'start'; // 'start', 'playing', 'gameOver'
+        let score = 0;
+        let speed = 2;
+        let gravity = 0.5;
+        let jumpStrength = -10;
+        let player = { x: 100, y: canvas.height - 100, width: 20, height: 20, vy: 0, onGround: false };
+        let obstacles = [];
+        let particles = [];
+        let shake = 0;
+        let beatTimer = 0;
+
+        // Obstacle types
+        function createObstacle(x) {
+            const type = Math.random() < 0.5 ? 'spike' : 'block';
+            if (type === 'spike') {
+                return { x, y: canvas.height - 50, width: 20, height: 50, type };
+            } else {
+                return { x, y: canvas.height - 70, width: 40, height: 20, type };
+            }
+        }
+
+        // Particle effect
+        function createParticles(x, y, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    life: 30
+                });
+            }
+        }
+
+        // Update game
+        function update() {
+            if (gameState !== 'playing') return;
+
+            // Player physics
+            player.vy += gravity;
+            player.y += player.vy;
+            if (player.y >= canvas.height - 100) {
+                player.y = canvas.height - 100;
+                player.vy = 0;
+                player.onGround = true;
+            } else {
+                player.onGround = false;
+            }
+
+            // Move obstacles
+            obstacles.forEach(ob => ob.x -= speed);
+            obstacles = obstacles.filter(ob => ob.x > -ob.width);
+
+            // Add new obstacles
+            if (Math.random() < 0.01) {
+                obstacles.push(createObstacle(canvas.width));
+            }
+
+            // Check collisions
+            obstacles.forEach(ob => {
+                if (player.x < ob.x + ob.width && player.x + player.width > ob.x &&
+                    player.y < ob.y + ob.height && player.y + player.height > ob.y) {
+                    gameOver();
+                }
+            });
+
+            // Update score
+            score += 1;
+            ui.textContent = `Score: ${Math.floor(score / 10)}`;
+
+            // Increase difficulty
+            speed += 0.001;
+
+            // Particles
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+            });
+            particles = particles.filter(p => p.life > 0);
+
+            // Screen shake
+            if (shake > 0) shake -= 0.5;
+
+            // Background beat
+            beatTimer++;
+            if (beatTimer % 60 === 0) {
+                // Simple visual beat (pulse effect)
+            }
+        }
+
+        // Render game
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Screen shake
+            ctx.save();
+            ctx.translate(Math.random() * shake - shake / 2, Math.random() * shake - shake / 2);
+
+            // Background
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Ground
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+
+            // Player
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Obstacles
+            obstacles.forEach(ob => {
+                ctx.fillStyle = ob.type === 'spike' ? '#f00' : '#666';
+                ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
+            });
+
+            // Particles
+            particles.forEach(p => {
+                ctx.fillStyle = `rgba(255, 255, 255, ${p.life / 30})`;
+                ctx.fillRect(p.x, p.y, 2, 2);
+            });
+
+            ctx.restore();
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+        gameLoop();
+
+        // Input
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'start') {
+                startGame();
+            } else if (gameState === 'playing') {
+                if (player.onGround) {
+                    player.vy = jumpStrength;
+                    createParticles(player.x + player.width / 2, player.y, 10);
+                }
+            }
+        });
+
+        // Start game
+        function startGame() {
+            gameState = 'playing';
+            score = 0;
+            speed = 2;
+            player.y = canvas.height - 100;
+            player.vy = 0;
+            obstacles = [];
+            particles = [];
+            shake = 0;
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+        }
+
+        // Game over
+        function gameOver() {
+            gameState = 'gameOver';
+            finalScore.textContent = `Score: ${Math.floor(score / 10)}`;
+            gameOverScreen.style.display = 'block';
+            shake = 10;
+            createParticles(player.x + player.width / 2, player.y + player.height / 2, 20);
+        }
+
+        // Restart
+        restartBtn.addEventListener('click', startGame);
+    </script>
+</body>
+</html>
