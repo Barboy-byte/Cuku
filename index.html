@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farm Sim</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #87CEEB; /* Sky blue */
+            font-family: Arial, sans-serif;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        canvas {
+            border: none;
+            background: #228B22; /* Forest green for ground */
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 16px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+            border-radius: 5px;
+        }
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 20;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background: #fff;
+            color: #000;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        Day: 1 | Time: Morning | Gold: 0 | Seeds: 5<br>
+        Tap a tile to plant/water/harvest!
+    </div>
+    <canvas id="game-canvas"></canvas>
+    <div id="start-screen">
+        <h1>Welcome to Farm Sim!</h1>
+        <p>Tap tiles to plant seeds, water crops, and harvest when ready. Survive the seasons!</p>
+        <button id="start-btn">Start Farming</button>
+    </div>
+    <div id="game-over-screen" style="display: none;">
+        <h1>Winter is Here!</h1>
+        <p id="final-score">Final Gold: 0</p>
+        <button id="restart-btn">Restart</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const ui = document.getElementById('ui');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const finalScore = document.getElementById('final-score');
+
+        // Set canvas size based on screen
+        function resizeCanvas() {
+            const isLandscape = window.innerWidth > window.innerHeight;
+            if (isLandscape) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            } else {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Game variables
+        let gameState = 'start'; // 'start', 'playing', 'gameOver'
+        let day = 1;
+        let timeOfDay = 'Morning'; // Morning, Afternoon, Evening, Night
+        let gold = 0;
+        let seeds = 5;
+        const gridSize = 10;
+        const tileSize = Math.min(canvas.width / gridSize, canvas.height / gridSize);
+        let farm = Array(gridSize).fill().map(() => Array(gridSize).fill(null)); // null, 'planted', 'watered', 'ready'
+        let timeCounter = 0;
+
+        // Crop data
+        const cropStages = ['planted', 'watered', 'ready'];
+
+        // Update game
+        function update() {
+            if (gameState !== 'playing') return;
+
+            timeCounter++;
+            if (timeCounter % 300 === 0) { // Advance time every 5 seconds (simulate)
+                advanceTime();
+            }
+
+            // Grow crops
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    if (farm[i][j] === 'watered') {
+                        farm[i][j] = 'ready'; // Simplified: watered crops become ready instantly
+                    }
+                }
+            }
+        }
+
+        // Advance time
+        function advanceTime() {
+            if (timeOfDay === 'Morning') timeOfDay = 'Afternoon';
+            else if (timeOfDay === 'Afternoon') timeOfDay = 'Evening';
+            else if (timeOfDay === 'Evening') timeOfDay = 'Night';
+            else {
+                timeOfDay = 'Morning';
+                day++;
+                if (day > 4) { // 4 seasons simplified to 4 days
+                    gameOver();
+                }
+            }
+            updateUI();
+        }
+
+        // Render game
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Sky color based on time
+            let skyColor = '#87CEEB';
+            if (timeOfDay === 'Evening') skyColor = '#FFA500';
+            else if (timeOfDay === 'Night') skyColor = '#000080';
+            ctx.fillStyle = skyColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Ground
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, canvas.height - tileSize * gridSize, canvas.width, tileSize * gridSize);
+
+            // Farm grid
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    const x = i * tileSize;
+                    const y = canvas.height - (j + 1) * tileSize;
+                    ctx.strokeStyle = '#000';
+                    ctx.strokeRect(x, y, tileSize, tileSize);
+
+                    if (farm[i][j]) {
+                        ctx.fillStyle = farm[i][j] === 'planted' ? '#8B4513' : farm[i][j] === 'watered' ? '#0000FF' : '#FFFF00';
+                        ctx.fillRect(x + 2, y + 2, tileSize - 4, tileSize - 4);
+                    }
+                }
+            }
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+        gameLoop();
+
+        // Input
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState !== 'playing') return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.touches[0].clientX - rect.left;
+            const y = e.touches[0].clientY - rect.top;
+            const gridX = Math.floor(x / tileSize);
+            const gridY = Math.floor((canvas.height - y) / tileSize);
+
+            if (gridX >= 0 && gridX < gridSize && gridY >= 0 && gridY < gridSize) {
+                const tile = farm[gridX][gridY];
+                if (!tile && seeds > 0) {
+                    farm[gridX][gridY] = 'planted';
+                    seeds--;
+                } else if (tile === 'planted') {
+                    farm[gridX][gridY] = 'watered';
+                } else if (tile === 'ready') {
+                    farm[gridX][gridY] = null;
+                    gold += 10;
+                }
+                updateUI();
+            }
+        });
+
+        // Update UI
+        function updateUI() {
+            ui.innerHTML = `Day: ${day} | Time: ${timeOfDay} | Gold: ${gold} | Seeds: ${seeds}<br>Tap a tile to plant/water/harvest!`;
+        }
+
+        // Start game
+        startBtn.addEventListener('click', () => {
+            gameState = 'playing';
+            day = 1;
+            timeOfDay = 'Morning';
+            gold = 0;
+            seeds = 5;
+            farm = Array(gridSize).fill().map(() => Array(gridSize).fill(null));
+            timeCounter = 0;
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            updateUI();
+        });
+
+        // Game over
+        function gameOver() {
+            gameState = 'gameOver';
+            finalScore.textContent = `Final Gold: ${gold}`;
+            gameOverScreen.style.display = 'block';
+        }
+
+        // Restart
+        restartBtn.addEventListener('click', () => {
+            startBtn.click();
+        });
+    </script>
+</body>
+</html>
